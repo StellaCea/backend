@@ -127,6 +127,82 @@ app.get('/allproducts', async (req, res)=>{
     res.send(products)
 })
 
+//Schema creating for User model
+const Users = mongoose.model('Users', {
+    name:{
+        type: String,
+    },
+    email:{
+        type: String,
+        unique: true,
+    }, 
+    password:{
+        type: String,
+    },
+    cartData:{
+        type:Object,
+    },
+    date:{
+        type: Date,
+        default: Date.now,
+    }
+})
+
+//Creating Endpoint for registering the user
+app.post('/signup', async (req, res)=>{
+    let check = await Users.findOne({email:req.body.email});
+    if (check) {
+        return res.status(400).json({success:false, errors:'existing user found with the same email'})
+    }
+//if there's no user, we create an empty cart
+    let cart = {};
+    for (let i = 0; i<300; i++){
+        cart[i] = 0;
+    }
+//create a user
+    const user = new Users({
+        name:req.body.username,
+        email:req.body.email,
+        password:req.body.password,
+        cartData:cart,
+    })
+//save the user in the db
+    await user.save();
+
+//create a token (in the user key we have an object with id and user id
+    const data = {
+        user:{
+            id:user.id
+        }
+    }
+//generate a token with sign method
+    const token = jwt.sign(data, 'secret_ecom');
+    res.json({success:true, token})
+})
+
+//Creating endpoint for user login
+app.post('/login', async (req, res)=>{
+    let user = await Users.findOne({email:req.body.email});
+    if (user) {
+        const passCompare = req.body.password === user.password;
+        if (passCompare) {
+            const data = {
+                user:{
+                    id:user.id
+                }
+            }
+            const token = jwt.sign(data,'secret_ecom');
+            res.json({success:true, token});
+        }
+        else{
+            res.json({success:false, errors:'wrong password'});
+        }
+    }
+    else {
+        res.json({success:false, errors:'wrong email id'})
+    }
+})
+
 app.listen(port, (error)=>{
     if(!error) {
         console.log('Server running on port' + port)
